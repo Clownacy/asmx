@@ -6360,7 +6360,7 @@ void DoLabelOp(int typ, int parm, char *labl)
             val = 0;
 
             // open binary file
-            incbin = fopen(word, "r");
+            incbin = fopen(word, "rb");
 
             if (incbin)
             {
@@ -7385,7 +7385,7 @@ int main(int argc, char * const argv[])
     }
     else if (cl_Obj)
     {
-        object = fopen(cl_ObjName, "w");
+        object = fopen(cl_ObjName, "wb");
         if (object == NULL)
         {
             fprintf(stderr,"Unable to create object output file '%s'!\n",cl_ObjName);
