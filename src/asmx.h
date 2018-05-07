@@ -6,12 +6,17 @@
 #define MAX_BYTSTR  1024    // size of bytStr[]
 
 #include <stdio.h>
-#include <sys/types.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdint.h>
+
+typedef unsigned char u_char;
+typedef unsigned short u_short;
+typedef unsigned int u_int;
+typedef unsigned long u_long;
 
 // a few useful typedefs
 typedef char Str255[256];       // generic string type
