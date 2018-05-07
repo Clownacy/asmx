@@ -168,6 +168,40 @@ struct OpcdRec Z80_opcdTab[] =
 // --------------------------------------------------------------
 
 
+// Special version of GetReg that better-detects an expression entire closed in parentheses (memory references, for instance).
+// This protects calculations, which might start with a parenthesis, such as this for example:
+// ld a,(1*2)+1
+int GetRegWrapper(const char *regList)
+{
+	char *tempLinePtr = linePtr;
+
+	int result = GetReg(regList);
+
+	if (result == reg_Paren)
+	{
+		// find comment, comma, or end of string
+		unsigned char  c = *tempLinePtr;
+
+		while (c != ';' && c != ',' && c != 0)
+		{
+			c = *++tempLinePtr;
+		}
+
+		// backtrack, and find the last non-whitespace character
+		c = *--tempLinePtr;
+		while (c == 12 || c == '\t' || c == ' ')
+		{
+			c = *--tempLinePtr;
+		}
+
+		if (c != ')')
+			result = reg_None;
+	}
+
+	return result;
+}
+
+
 int IXOffset()
 {
     char    *oldLine;
@@ -210,7 +244,7 @@ void DoArith(int imm, int reg)
     int         val;
 
     oldLine = linePtr;
-    switch((reg2 = GetReg(Z80_regs)))
+    switch((reg2 = GetRegWrapper(Z80_regs)))
     {
         case reg_EOL:
             break;
@@ -232,7 +266,7 @@ void DoArith(int imm, int reg)
             break;
 
         case reg_Paren: // ADD A,(
-            switch((reg2 = GetReg(Z80_regs)))
+            switch((reg2 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -289,7 +323,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
         // LDI/LDD:
             parm = ((parm & 0x08) << 1) | 0x22; // fall-through for LDI/LDD
 
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -297,7 +331,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                 case reg_A:     // A,(HL)
                     if (Comma()) break;
                     if (Expect("(")) break;
-                    switch((reg1 = GetReg(Z80_regs)))
+                    switch((reg1 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -313,7 +347,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                     break;
 
                 case reg_Paren: // (HL),A
-                    switch((reg1 = GetReg(Z80_regs)))
+                    switch((reg1 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -336,7 +370,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
             break;
 
         case o_LD:
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -354,7 +388,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                 case reg_A:     // LD r,?
                     if (Comma()) break;
                     oldLine = linePtr;
-                    switch((reg2 = GetReg(Z80_regs)))
+                    switch((reg2 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -381,7 +415,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
 
                         case reg_Paren:     // LD r,(?)
                             oldLine = linePtr;
-                            switch((reg2 = GetReg(Z80_regs)))
+                            switch((reg2 = GetRegWrapper(Z80_regs)))
                             {
                                 case reg_EOL:
                                     break;
@@ -500,7 +534,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                 case reg_SP:    // LD rr,?
                     if (Comma()) break;
                     oldLine = linePtr;
-                    switch((reg2 = GetReg(Z80_regs)))
+                    switch((reg2 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -568,7 +602,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                     if (curCPU == CPU_GBZ80) { IllegalOperand(); break; }
                     if (Comma()) break;
                     oldLine = linePtr;
-                    switch((reg2 = GetReg(Z80_regs)))
+                    switch((reg2 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -601,7 +635,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
 
                 case reg_Paren:     // LD (?),?
                     oldLine = linePtr;
-                    switch((reg1 = GetReg(Z80_regs)))
+                    switch((reg1 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -611,7 +645,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                             val = Eval();
                             if (RParen()) break;
                             if (Comma()) break;
-                            switch((reg2 = GetReg(Z80_regs)))
+                            switch((reg2 = GetRegWrapper(Z80_regs)))
                             {
                                 case reg_EOL:
                                     break;
@@ -715,7 +749,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                                 if (RParen()) break;
                                 if (Comma()) break;
                                 oldLine = linePtr;
-                                switch((reg2 = GetReg(Z80_regs)))
+                                switch((reg2 = GetRegWrapper(Z80_regs)))
                                 {
                                     case reg_EOL:
                                         break;
@@ -747,7 +781,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                                 val = IXOffset();
                                 if (Comma()) break;
                                 oldLine = linePtr;
-                                switch((reg2 = GetReg(Z80_regs)))
+                                switch((reg2 = GetRegWrapper(Z80_regs)))
                                 {
                                     case reg_EOL:
                                         break;
@@ -783,7 +817,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
 
         case o_EX:
             if (curCPU == CPU_GBZ80) return 0;
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -805,7 +839,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                     if (Expect("SP")) break;
                     if (RParen()) break;
                     if (Comma()) break;
-                    switch((reg2 = GetReg(Z80_regs)))
+                    switch((reg2 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -826,7 +860,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
 
         case o_ADD:
             oldLine = linePtr;
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -877,7 +911,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                     if (curCPU == CPU_GBZ80) { IllegalOperand(); break; }
                 case reg_HL:
                     if (Comma()) break;
-                    switch((reg2 = GetReg(Z80_regs)))
+                    switch((reg2 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -915,7 +949,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
 
         case o_ADC_SBC:
             oldLine = linePtr;
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -951,7 +985,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                 case reg_HL:
                     if (curCPU == CPU_GBZ80) { IllegalOperand(); break; }
                     if (Comma()) break;
-                    switch((reg2 = GetReg(Z80_regs)))
+                    switch((reg2 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -974,7 +1008,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
             break;
 
         case o_INC_DEC:
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -1007,7 +1041,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                     break;
 
                 case reg_Paren: // INC (HL)
-                    switch((reg1 = GetReg(Z80_regs)))
+                    switch((reg1 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -1046,7 +1080,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                     IllegalOperand();
                 else
                 {
-                    reg1 = GetReg(Z80_regs);
+                    reg1 = GetRegWrapper(Z80_regs);
                     if (RParen()) break;
                     switch(reg1)
                     {
@@ -1096,7 +1130,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
 
         case o_JR:
             oldLine = linePtr;
-            switch((reg1 = GetReg(conds)))
+            switch((reg1 = GetRegWrapper(conds)))
             {
                 case reg_EOL:
                     break;
@@ -1134,7 +1168,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
 
         case o_IN:
             if (curCPU == CPU_GBZ80) return 0;
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -1149,7 +1183,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                     if (Comma()) break;
                     if (Expect("(")) break;
                     oldLine = linePtr;
-                    switch((reg2 = GetReg(Z80_regs)))
+                    switch((reg2 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -1185,7 +1219,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
             if (curCPU == CPU_GBZ80) return 0;
             if (Expect("(")) break;
             oldLine = linePtr;
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -1202,7 +1236,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                 case reg_C:
                     if (RParen()) break;
                     if (Comma()) break;
-                    switch((reg2 = GetReg(Z80_regs)))
+                    switch((reg2 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -1228,7 +1262,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
             break;
 
         case o_PushPop:
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -1256,7 +1290,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
             break;
 
         case o_Rotate:
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -1272,7 +1306,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                     break;
 
                 case reg_Paren:
-                    switch((reg1 = GetReg(Z80_regs)))
+                    switch((reg1 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -1352,7 +1386,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
 
         case o_SWAP:
             if (curCPU != CPU_GBZ80) return 0;
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -1368,7 +1402,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
                     break;
 
                 case reg_Paren:
-                    switch((reg1 = GetReg(Z80_regs)))
+                    switch((reg1 = GetRegWrapper(Z80_regs)))
                     {
                         case reg_EOL:
                             break;
@@ -1390,7 +1424,7 @@ int Z80_DoCPUOpcode(int typ, int parm)
 
         case o_LDH:
             if (curCPU != CPU_GBZ80) return 0;
-            switch((reg1 = GetReg(Z80_regs)))
+            switch((reg1 = GetRegWrapper(Z80_regs)))
             {
                 case reg_EOL:
                     break;
@@ -1461,7 +1495,7 @@ int Z80_DoCPULabelOp(int typ, int parm, char *labl)
                     Error("\",\" expected");
                     break;
                 }
-                switch((reg2 = GetReg(Z80_regs)))
+                switch((reg2 = GetRegWrapper(Z80_regs)))
                 {
                     case reg_EOL:
                         break;
@@ -1477,7 +1511,7 @@ int Z80_DoCPULabelOp(int typ, int parm, char *labl)
                         break;
 
                     case reg_Paren:     // BIT n,(HL)
-                        switch((reg2 = GetReg(Z80_regs)))
+                        switch((reg2 = GetRegWrapper(Z80_regs)))
                         {
                             case reg_EOL:
                                 break;
