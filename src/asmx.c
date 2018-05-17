@@ -172,6 +172,7 @@ Str255          cl_ListName;        // Listing file name
 Str255          cl_ObjName;         // Object file name
 bool            cl_Err;             // TRUE for errors to screen
 bool            cl_Warn;            // TRUE for warnings to screen
+bool            cl_Message;         // TRUE for messages to screen
 bool            cl_List;            // TRUE to generate listing file
 bool            cl_Obj;             // TRUE to generate object file
 
@@ -293,6 +294,8 @@ enum
     o_LIST,     // LIST pseudo-op
     o_OPT,      // OPT pseudo-op
     o_ERROR,    // ERROR pseudo-op
+    o_WARNING,  // WARNING pseudo-op
+    o_MESSAGE,  // MESSAGE pseudo-op
     o_ASSERT,   // ASSERT pseudo-op
     o_ERRZR,    // ERRZR pseudo-op
     o_ERRNZ,    // ERRNZ pseudo-op
@@ -387,6 +390,8 @@ struct OpcdRec opcdTab2[] =
     {"LIST",      o_LIST,     0},
     {"OPT",       o_OPT,      0},
     {"ERROR",     o_ERROR,    0},
+    {"WARNING",   o_WARNING,  0},
+    {"MESSAGE",   o_MESSAGE,  0},
     {"ASSERT",    o_ASSERT,   0},
     {"ERRZR",     o_ERRZR,    0},
     {"ERRNZ",     o_ERRNZ,    0},
@@ -633,6 +638,38 @@ void AsmInit(void)
 
 // --------------------------------------------------------------
 // error messages
+
+
+/*
+ *  Message
+ */
+
+void Message(char *message)
+{
+    char *name;
+    int line;
+
+    name = cl_SrcName;
+    line = linenum;
+    if (nInclude >= 0)
+    {
+        name = incname[nInclude];
+        line = incline[nInclude];
+    }
+
+    if (pass == 2)
+    {
+        listThisLine = true;
+        if (cl_List)
+        {
+            fprintf(listing, "%s:%d: *** Message:  %s ***\n",name,line,message);
+        }
+        if (cl_Message)
+        {
+            fprintf(stderr,  "%s:%d: *** Message:  %s ***\n",name,line,message);
+        }
+    }
+}
 
 
 /*
@@ -5786,6 +5823,30 @@ void DoLabelOp(int typ, int parm, char *labl)
             Error(linePtr);
             break;
 
+        case o_WARNING:
+            if (labl[0])
+            {
+                Error("Label not allowed");
+            }
+            while (*linePtr == ' ' || *linePtr == '\t')
+            {
+                linePtr++;
+            }
+            Warning(linePtr);
+            break;
+
+        case o_MESSAGE:
+            if (labl[0])
+            {
+                Error("Label not allowed");
+            }
+            while (*linePtr == ' ' || *linePtr == '\t')
+            {
+                linePtr++;
+            }
+            Message(linePtr);
+            break;
+
         case o_ASSERT:
             if (labl[0])
             {
@@ -7052,7 +7113,7 @@ void getopts(int argc, char * const argv[])
     int     token;
     int     neg;
 
-    while ((ch = getopt(argc, argv, "hew19tb:cd:l:o:s:C:?")) != -1)
+    while ((ch = getopt(argc, argv, "hewm19tb:cd:l:o:s:C:?")) != -1)
     {
         errFlag = false;
         switch (ch)
@@ -7063,6 +7124,10 @@ void getopts(int argc, char * const argv[])
 
             case 'w':
                 cl_Warn = true;
+                break;
+
+            case 'm':
+                cl_Message = true;
                 break;
 
             case '1': // -1 option also appears deprecated
@@ -7328,6 +7393,7 @@ int main(int argc, char * const argv[])
 
     cl_Err     = false;
     cl_Warn    = false;
+    cl_Message = false;
     cl_List    = false;
     cl_Obj     = false;
     cl_ObjType = OBJ_HEX;
